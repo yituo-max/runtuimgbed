@@ -1042,6 +1042,13 @@
     </div>
 
     <script>
+        // 全局变量
+        let adminToken = localStorage.getItem('adminToken');
+        let adminUsername = localStorage.getItem('adminUsername');
+        
+        // 全局函数
+        let showNotification, renderGallery, renderCategories;
+        
         document.addEventListener('DOMContentLoaded', function() {
             // DOM 元素
             const loginPage = document.getElementById('loginPage');
@@ -1052,10 +1059,6 @@
             const passwordInput = document.getElementById('password');
             const loginError = document.getElementById('loginError');
             const adminName = document.getElementById('adminName');
-            
-            // 管理员认证相关变量
-            let adminToken = localStorage.getItem('adminToken');
-            let adminUsername = localStorage.getItem('adminUsername');
             
             // 检查是否已登录
             function checkAuthStatus() {
@@ -1281,7 +1284,7 @@
 
                 // 测试API按钮事件
                 testBtn.addEventListener('click', function() {
-                    fetch('/.netlify/functions/test')
+                    fetch('/api/test')
                         .then(response => response.json())
                         .then(data => {
                             showNotification('API测试成功: ' + data.message, 'success');
@@ -1449,8 +1452,8 @@
                         progressText.textContent = Math.round(progress) + '%';
                     }, 300);
 
-                    // 发送请求到Netlify函数
-                    fetch('/.netlify/functions/upload', {
+                    // 发送请求到Vercel函数
+                    fetch('/api/upload', {
                         method: 'POST',
                         body: formData
                     })
@@ -1532,7 +1535,7 @@
                 }
 
                 // 渲染图片库
-                function renderGallery() {
+                renderGallery = function() {
                     const searchTerm = searchInput.value.toLowerCase();
                     const categoryFilter = filterCategory.value;
                     
@@ -1608,10 +1611,10 @@
                             }
                         });
                     }
-                }
+                };
 
                 // 渲染分类列表
-                function renderCategories() {
+                renderCategories = function() {
                     categoriesList.innerHTML = '';
                     
                     categories.forEach(category => {
@@ -1664,7 +1667,7 @@
                             });
                         });
                     }
-                }
+                };
 
                 // 添加新分类
                 addCategoryBtn.addEventListener('click', function() {
@@ -1723,9 +1726,7 @@
                         
                         // 从分类列表中删除
                         const index = categories.indexOf(category);
-                        if (index > -1) {
-                            categories.splice(index, 1);
-                        }
+                        categories.splice(index, 1);
                         
                         saveDataToStorage();
                         updateCategorySelects();
@@ -1736,31 +1737,37 @@
                 }
 
                 // 删除图片
-                function deleteImage(id) {
-                    if (confirm('确定要删除这张图片吗？')) {
-                        const index = imageGallery.findIndex(img => img.id === id);
-                        if (index > -1) {
-                            imageGallery.splice(index, 1);
-                            saveDataToStorage();
-                            renderGallery();
-                            showNotification('图片删除成功', 'success');
-                        }
+                function deleteImage(imageId) {
+                    const index = imageGallery.findIndex(img => img.id === imageId);
+                    if (index !== -1) {
+                        const imageName = imageGallery[index].name;
+                        imageGallery.splice(index, 1);
+                        saveDataToStorage();
+                        renderGallery();
+                        renderCategories();
+                        showNotification(`图片 "${imageName}" 已删除`, 'success');
                     }
                 }
 
                 // 复制到剪贴板
                 function copyToClipboard(text) {
-                    // 尝试使用现代剪贴板API
-                    if (navigator.clipboard && window.isSecureContext) {
+                    // 使用现代API
+                    if (navigator.clipboard) {
                         navigator.clipboard.writeText(text).then(() => {
                             showNotification('已复制到剪贴板', 'success');
                         }).catch(err => {
                             console.error('复制失败:', err);
-                            fallbackCopyTextToClipboard(text);
+                            showNotification('复制失败', 'error');
                         });
                     } else {
-                        // 回退到传统方法
-                        fallbackCopyTextToClipboard(text);
+                        // 降级方案
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        showNotification('已复制到剪贴板', 'success');
                     }
                 }
                 
@@ -1806,7 +1813,7 @@
                 filterCategory.addEventListener('change', renderGallery);
 
                 // 显示通知
-                function showNotification(message, type = 'info') {
+                showNotification = function(message, type = 'info') {
                     notificationText.textContent = message;
                     notification.className = 'notification ' + type;
                     
@@ -1832,18 +1839,26 @@
                     setTimeout(() => {
                         notification.classList.remove('show');
                     }, 3000);
+                };
+                
+                // 格式化文件大小
+                function formatFileSize(bytes) {
+                    if (bytes === 0) return '0 Bytes';
+                    
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
                 }
                 
-                // 初始化应用
+                // 调用初始化函数
                 init();
-            }
-
-            // 初始化应用
-            initApp();
+            } // initApp函数结束
             
-            // 检查登录状态
+            // 检查是否已登录
             checkAuthStatus();
-        });
+        }); // DOMContentLoaded事件监听器结束
     </script>
 </body>
 </html>
